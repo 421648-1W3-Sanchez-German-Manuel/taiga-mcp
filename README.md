@@ -4,6 +4,10 @@ A local MCP server connecting Claude Code to a Taiga project: read/create/update
 user stories, tasks, epics, and issues, plus comment on items to link them to
 git branches, commits, or pull requests.
 
+## Requirements
+
+- Node.js 18 or newer (uses the built-in `fetch` API). Check with `node -v`.
+
 ## Setup (each teammate does this once, with their own Taiga login)
 
 1. Clone this repo and install dependencies:

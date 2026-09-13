@@ -4,6 +4,9 @@
   "description": "MCP server connecting Claude to Taiga projects, epics, user stories, tasks, issues and sprints.",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "tsx src/index.ts",
     "test": "tsx --test test/*.test.ts"

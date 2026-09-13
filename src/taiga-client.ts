@@ -61,10 +61,10 @@ export class TaigaClient {
     return this.token;
   }
 
-  private async request<T>(
+  private async requestRaw(
     path: string,
     options: { method?: string; body?: unknown; query?: Record<string, unknown> } = {}
-  ): Promise<T> {
+  ): Promise<{ data: any; headers: Headers }> {
     const token = await this.ensureAuth();
     const url = new URL(`${this.config.baseUrl}${path}`);
     if (options.query) {
@@ -84,7 +84,7 @@ export class TaigaClient {
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
 
-    if (res.status === 204) return undefined as T;
+    if (res.status === 204) return { data: undefined, headers: res.headers };
 
     const text = await res.text();
     const data = text ? JSON.parse(text) : undefined;
@@ -95,7 +95,46 @@ export class TaigaClient {
       );
     }
 
+    return { data, headers: res.headers };
+  }
+
+  private async request<T>(
+    path: string,
+    options: { method?: string; body?: unknown; query?: Record<string, unknown> } = {}
+  ): Promise<T> {
+    const { data } = await this.requestRaw(path, options);
     return data as T;
+  }
+
+  /**
+   * Fetches all pages of a Taiga list endpoint. Taiga paginates list responses
+   * (default page size ~30) and reports the total via the x-pagination-count
+   * header, so a plain single request would silently truncate large lists.
+   */
+  private async requestAllPages<T>(
+    path: string,
+    query: Record<string, unknown> = {}
+  ): Promise<T[]> {
+    const pageSize = 100;
+    const results: T[] = [];
+    let page = 1;
+
+    while (true) {
+      const { data, headers } = await this.requestRaw(path, {
+        query: { ...query, page, page_size: pageSize },
+      });
+      const items = (data as T[]) ?? [];
+      results.push(...items);
+
+      const totalCountHeader = headers.get("x-pagination-count");
+      const totalCount = totalCountHeader ? Number(totalCountHeader) : null;
+
+      if (items.length < pageSize) break;
+      if (totalCount !== null && results.length >= totalCount) break;
+      page++;
+    }
+
+    return results;
   }
 
   /** Resolves a project slug or numeric id (or the configured default) to a numeric project id. */
@@ -120,7 +159,7 @@ export class TaigaClient {
 
   async listProjects() {
     await this.ensureAuth();
-    return this.request<any[]>("/projects", { query: { member: this.userId! } });
+    return this.requestAllPages<any>("/projects", { member: this.userId! });
   }
 
   async getProject(projectRef?: string) {
@@ -162,14 +201,12 @@ export class TaigaClient {
     } = {}
   ) {
     const project = await this.resolveProjectId(filters.projectRef);
-    return this.request<any[]>(`/${ENTITY_ENDPOINT[type]}`, {
-      query: {
-        project,
-        status: filters.status,
-        milestone: filters.milestone,
-        assigned_to: filters.assignedTo,
-        user_story: filters.userStory,
-      },
+    return this.requestAllPages<any>(`/${ENTITY_ENDPOINT[type]}`, {
+      project,
+      status: filters.status,
+      milestone: filters.milestone,
+      assigned_to: filters.assignedTo,
+      user_story: filters.userStory,
     });
   }
 
