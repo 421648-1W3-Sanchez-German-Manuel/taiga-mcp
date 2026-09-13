@@ -197,6 +197,50 @@ export class TaigaClient {
     return this.request<any[]>(`/${endpoint}`, { query: { project } });
   }
 
+  /** The project's Fibonacci-style point scale (e.g. 0, 1, 2, 3, 5, 8, 13...), each with an id. */
+  async listPoints(projectRef?: string) {
+    const project = await this.resolveProjectId(projectRef);
+    return this.request<any[]>("/points", { query: { project } });
+  }
+
+  /** Roles that estimate user stories (e.g. Design, Development). */
+  async listRoles(projectRef?: string) {
+    const project = await this.resolveProjectId(projectRef);
+    return this.request<any[]>("/roles", { query: { project } });
+  }
+
+  /**
+   * Sets a user story's points to a given Fibonacci value for every
+   * "computable" (estimating) role. Taiga stores points per-role as a
+   * mapping of role id -> points-scale-entry id, not the raw number, so
+   * this resolves `value` against the project's point scale first.
+   */
+  async setPoints(id: number, value: number, projectRef?: string) {
+    const story = await this.get("userstory", id);
+    const project = projectRef ? await this.resolveProjectId(projectRef) : story.project;
+
+    const [points, roles] = await Promise.all([
+      this.listPoints(String(project)),
+      this.listRoles(String(project)),
+    ]);
+
+    const pointEntry = points.find((p: any) => p.value === value);
+    if (!pointEntry) {
+      const available = points.map((p: any) => p.value).join(", ");
+      throw new Error(
+        `No point value ${value} in this project's scale. Available values: ${available}`
+      );
+    }
+
+    const computableRoles = roles.filter((r: any) => r.computable);
+    const pointsMap: Record<string, number> = {};
+    for (const role of computableRoles) {
+      pointsMap[String(role.id)] = pointEntry.id;
+    }
+
+    return this.update("userstory", id, { points: pointsMap });
+  }
+
   async list(
     type: EntityType,
     filters: {

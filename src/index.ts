@@ -85,6 +85,31 @@ server.registerTool(
   async ({ type, project }) => safe(() => taiga.listStatuses(type as EntityType, project))
 );
 
+server.registerTool(
+  "taiga_list_points",
+  {
+    description:
+      "List the project's point scale (e.g. 0, 1, 2, 3, 5, 8, 13...). Use this to see valid values before calling taiga_set_points.",
+    inputSchema: { project: projectRefSchema },
+  },
+  async ({ project }) => safe(() => taiga.listPoints(project))
+);
+
+server.registerTool(
+  "taiga_set_points",
+  {
+    description:
+      "Set a user story's estimation points to a value from the project's point scale (see taiga_list_points). " +
+      "Only user stories have points in Taiga (not tasks, epics, or issues); this applies the value to every estimating role on the story.",
+    inputSchema: {
+      id: z.number().describe("The user story's numeric id."),
+      points: z.number().describe("A value from the project's point scale, e.g. 5."),
+      project: projectRefSchema,
+    },
+  },
+  async ({ id, points, project }) => safe(() => taiga.setPoints(id, points, project))
+);
+
 // ---- Read ----
 
 const listFiltersSchema = {

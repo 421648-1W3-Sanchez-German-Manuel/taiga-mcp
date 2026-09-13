@@ -41,6 +41,10 @@ mockups, docs) to any item.
 - `taiga_list_members` — project members, for resolving assignee user ids.
 - `taiga_list_milestones` — sprints.
 - `taiga_list_statuses` — valid status ids per entity type.
+- `taiga_list_points` — the project's Fibonacci point scale (0, 1, 2, 3, 5, 8...).
+- `taiga_set_points` — set a user story's estimation points (Taiga only
+  supports points on user stories, not tasks/epics/issues, and stores them
+  per estimating role — this handles that automatically).
 - `taiga_list_items` / `taiga_get_item` — read user stories, tasks, epics, issues.
 - `taiga_create_item` — create a new item (task can be linked to a user story
   via `userStory`; a user story can be linked to an epic via `epic`).
