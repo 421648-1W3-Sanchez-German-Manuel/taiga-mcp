@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>taiga-mcp — Setup Checklist</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f5;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e3e2de;
+    --accent: #2f6f4f;
+    --accent-bg: #e8f3ec;
+    --code-bg: #f0efeb;
+    --done-bg: #f1f8f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a;
+      --card: #202124;
+      --text: #ececec;
+      --muted: #9a9a9a;
+      --border: #34363a;
+      --accent: #6fcf97;
+      --accent-bg: #1f2e26;
+      --code-bg: #26282c;
+      --done-bg: #1b2620;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding-block: 40px;
+    padding-inline: 16px;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  .progress-wrap {
+    background: var(--border);
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.25s ease;
+  }
+  .progress-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    transition: background 0.15s ease;
+  }
+  .step.done { background: var(--done-bg); }
+  .step input[type="checkbox"] {
+    margin-top: 3px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title {
+    font-weight: 600;
+    margin: 0 0 4px;
+    cursor: pointer;
+  }
+  .step.done .step-title { color: var(--muted); text-decoration: line-through; }
+  .step-desc { color: var(--muted); margin: 0 0 10px; }
+  .step.done .step-desc { color: var(--muted); opacity: 0.7; }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    word-break: break-word;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 0 0 8px;
+  }
+  pre code { background: none; padding: 0; }
+  .note {
+    font-size: 0.85rem;
+    color: var(--muted);
+    background: var(--accent-bg);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-top: 8px;
+  }
+  .footer {
+    margin-top: 32px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+  }
+  .reset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>taiga-mcp setup checklist</h1>
+  <p class="sub">Connects Claude Code to your Taiga project. Check off each step as you go — this is saved in your browser.</p>
+
+  <div class="progress-wrap"><div class="progress-bar" id="bar"></div></div>
+  <p class="progress-label" id="progressLabel">0 of 0 done</p>
+
+  <div id="steps"></div>
+
+  <div class="footer">
+    <button class="reset-btn" id="resetBtn">Reset checklist</button>
+  </div>
+</div>
+
+<script>
+const steps = [
+  {
+    title: "1. Check your Node.js version",
+    desc: "The server needs Node 18 or newer (it uses the built-in fetch API).",
+    code: "node -v",
+    note: "If this is below v18, install a newer Node before continuing (e.g. via nvm or brew)."
+  },
+  {
+    title: "2. Clone the repo",
+    desc: "Get the code onto your machine.",
+    code: "git clone https://github.com/421648-1W3-Sanchez-German-Manuel/taiga-mcp.git\ncd taiga-mcp"
+  },
+  {
+    title: "3. Install dependencies",
+    desc: "Installs the MCP SDK and everything else the server needs.",
+    code: "npm install"
+  },
+  {
+    title: "4. Create your .env file",
+    desc: "Copy the example file — this is where your personal Taiga credentials live.",
+    code: "cp .env.example .env"
+  },
+  {
+    title: "5. Fill in .env with your own Taiga login",
+    desc: "Open .env and set these four values. Use your own Taiga username/password, not a shared account, so actions show up under your name in Taiga.",
+    code: "TAIGA_BASE_URL=https://api.taiga.io/api/v1\nTAIGA_USERNAME=your-email-or-username\nTAIGA_PASSWORD=your-password\nTAIGA_PROJECT=your-project-slug",
+    note: "TAIGA_PROJECT is the slug from your project URL: https://tree.taiga.io/project/<slug>/"
+  },
+  {
+    title: "6. Register the server with Claude Code",
+    desc: "Run this from inside the taiga-mcp folder. It registers the server for all your projects and points it at your local .env for credentials.",
+    code: 'claude mcp add taiga -s user -e DOTENV_CONFIG_PATH="$(pwd)/.env" -- npx tsx "$(pwd)/src/index.ts"'
+  },
+  {
+    title: "7. Restart Claude Code",
+    desc: "MCP servers are loaded at startup, so quit and reopen Claude Code (or start a new session)."
+  },
+  {
+    title: "8. Verify the connection",
+    desc: "This should print Status: ✔ Connected.",
+    code: "claude mcp get taiga"
+  },
+  {
+    title: "9. (Optional) Run the smoke tests",
+    desc: "Confirms your credentials actually work against the real Taiga API.",
+    code: "npm test"
+  },
+  {
+    title: "10. Try it out",
+    desc: 'In a Claude Code session, ask something like "list my Taiga projects" or "show open user stories in my project" and confirm you get real data back.'
+  }
+];
+
+const stepsEl = document.getElementById('steps');
+const STORAGE_KEY = 'taiga-mcp-setup-checklist';
+
+function loadState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+let state = loadState();
+
+function render() {
+  stepsEl.innerHTML = '';
+  steps.forEach((step, i) => {
+    const done = !!state[i];
+    const div = document.createElement('div');
+    div.className = 'step' + (done ? ' done' : '');
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = done;
+    checkbox.id = 'step-' + i;
+    checkbox.addEventListener('change', () => {
+      state[i] = checkbox.checked;
+      saveState(state);
+      render();
+    });
+
+    const body = document.createElement('div');
+    body.className = 'step-body';
+
+    const title = document.createElement('label');
+    title.className = 'step-title';
+    title.htmlFor = checkbox.id;
+    title.textContent = step.title;
+
+    const desc = document.createElement('p');
+    desc.className = 'step-desc';
+    desc.textContent = step.desc || '';
+
+    body.appendChild(title);
+    if (step.desc) body.appendChild(desc);
+
+    if (step.code) {
+      const pre = document.createElement('pre');
+      const codeEl = document.createElement('code');
+      codeEl.textContent = step.code;
+      pre.appendChild(codeEl);
+      body.appendChild(pre);
+    }
+
+    if (step.note) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = step.note;
+      body.appendChild(note);
+    }
+
+    div.appendChild(checkbox);
+    div.appendChild(body);
+    stepsEl.appendChild(div);
+  });
+
+  const doneCount = steps.filter((_, i) => state[i]).length;
+  document.getElementById('bar').style.width = (doneCount / steps.length * 100) + '%';
+  document.getElementById('progressLabel').textContent = doneCount + ' of ' + steps.length + ' done';
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  state = {};
+  saveState(state);
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

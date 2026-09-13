@@ -5,34 +5,60 @@ user stories, tasks, epics, and issues; comment on items to link them to git
 branches, commits, or pull requests; and attach images/files (screenshots,
 mockups, docs) to any item.
 
+> **Setup checklist:** open [`SETUP.html`](./SETUP.html) in a browser for an
+> interactive, checkbox version of the steps below.
+
 ## Requirements
 
-- Node.js 18 or newer (uses the built-in `fetch` API). Check with `node -v`.
+- Node.js 18 or newer (uses the built-in `fetch` API).
 
 ## Setup (each teammate does this once, with their own Taiga login)
 
-1. Clone this repo and install dependencies:
+1. Check your Node.js version (must be 18+):
    ```
-   git clone <this-repo-url> taiga-mcp
+   node -v
+   ```
+2. Clone the repo:
+   ```
+   git clone https://github.com/421648-1W3-Sanchez-German-Manuel/taiga-mcp.git
    cd taiga-mcp
+   ```
+3. Install dependencies:
+   ```
    npm install
    ```
-2. Copy `.env.example` to `.env` and fill in **your own** Taiga username/password
-   and the team's default project slug or id:
+4. Create your `.env` file:
    ```
    cp .env.example .env
    ```
-   Everyone should use their own Taiga credentials here, not a shared account —
-   that way actions in Taiga (comments, status changes) show up under the
-   right person.
-3. Register the server with Claude Code (run from inside the `taiga-mcp` folder):
+5. Fill in `.env` with **your own** Taiga login (not a shared account — this
+   way comments/status changes show up under your name in Taiga):
+   ```
+   TAIGA_BASE_URL=https://api.taiga.io/api/v1
+   TAIGA_USERNAME=your-email-or-username
+   TAIGA_PASSWORD=your-password
+   TAIGA_PROJECT=your-project-slug
+   ```
+   `TAIGA_PROJECT` is the slug from your project URL:
+   `https://tree.taiga.io/project/<slug>/`
+6. Register the server with Claude Code (run from inside the `taiga-mcp` folder):
    ```
    claude mcp add taiga -s user -e DOTENV_CONFIG_PATH="$(pwd)/.env" -- npx tsx "$(pwd)/src/index.ts"
    ```
    This registers it once, for all your projects (`-s user`), pointing at your
    local `.env` for credentials so nothing sensitive is stored in Claude's config.
-4. Restart Claude Code. Run `claude mcp get taiga` to confirm it shows
-   `Status: ✔ Connected`.
+7. Restart Claude Code (or start a new session) — MCP servers load at startup.
+8. Verify the connection:
+   ```
+   claude mcp get taiga
+   ```
+   This should print `Status: ✔ Connected`.
+9. (Optional) Run the smoke tests to confirm your credentials work:
+   ```
+   npm test
+   ```
+10. Try it: in a Claude Code session, ask something like "list my Taiga
+    projects" or "show open user stories in my project."
 
 ## Tools
 
