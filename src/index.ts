@@ -217,5 +217,46 @@ server.registerTool(
     )
 );
 
+// ---- Attachments (images, screenshots, files) ----
+
+server.registerTool(
+  "taiga_list_attachments",
+  {
+    description: "List files/images attached to a user story, task, epic, or issue.",
+    inputSchema: { type: entityTypeSchema, id: z.number().describe("The item's numeric id.") },
+  },
+  async ({ type, id }) => safe(() => taiga.listAttachments(type as EntityType, id))
+);
+
+server.registerTool(
+  "taiga_add_attachment",
+  {
+    description:
+      "Attach a local file (image, screenshot, PDF, etc.) to a user story, task, epic, or issue. " +
+      "`filePath` must be an absolute path to a file readable on this machine (e.g. a screenshot you've just saved).",
+    inputSchema: {
+      type: entityTypeSchema,
+      id: z.number().describe("The item's numeric id."),
+      filePath: z.string().describe("Absolute path to the local file to upload."),
+      description: z.string().optional().describe("Optional caption/description for the attachment."),
+    },
+  },
+  async ({ type, id, filePath, description }) =>
+    safe(() => taiga.addAttachment(type as EntityType, id, filePath, description))
+);
+
+server.registerTool(
+  "taiga_delete_attachment",
+  {
+    description: "Remove a previously added attachment from an item.",
+    inputSchema: {
+      type: entityTypeSchema,
+      attachmentId: z.number().describe("The attachment's numeric id (see taiga_list_attachments)."),
+    },
+  },
+  async ({ type, attachmentId }) =>
+    safe(() => taiga.deleteAttachment(type as EntityType, attachmentId))
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

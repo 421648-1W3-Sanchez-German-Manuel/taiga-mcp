@@ -1,8 +1,9 @@
 # taiga-mcp
 
 A local MCP server connecting Claude Code to a Taiga project: read/create/update
-user stories, tasks, epics, and issues, plus comment on items to link them to
-git branches, commits, or pull requests.
+user stories, tasks, epics, and issues; comment on items to link them to git
+branches, commits, or pull requests; and attach images/files (screenshots,
+mockups, docs) to any item.
 
 ## Requirements
 
@@ -46,6 +47,15 @@ git branches, commits, or pull requests.
 - `taiga_update_item` — change subject, description, status, assignee, sprint.
 - `taiga_add_comment` — comment on an item, optionally attaching a
   branch/commit/PR URL via `linkUrl`/`linkLabel`.
+- `taiga_list_attachments` — list files/images attached to an item.
+- `taiga_add_attachment` — attach a local file (image, screenshot, PDF, etc.)
+  to an item, given an absolute `filePath`.
+- `taiga_delete_attachment` — remove a previously added attachment.
+
+> **Note:** `taiga_create_item`, `taiga_update_item`, `taiga_add_comment`, and
+> the attachment tools are write operations that have been type-checked and
+> code-reviewed but **not yet run against a real Taiga project**. Test them
+> against a non-critical item before relying on them for real work.
 
 ## Testing
 

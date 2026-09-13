@@ -75,13 +75,20 @@ export class TaigaClient {
       }
     }
 
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    let body: BodyInit | undefined;
+    if (options.body instanceof FormData) {
+      // Let fetch set the multipart Content-Type (with boundary) itself.
+      body = options.body;
+    } else if (options.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(options.body);
+    }
+
     const res = await fetch(url, {
       method: options.method || "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      headers,
+      body,
     });
 
     if (res.status === 204) return { data: undefined, headers: res.headers };
@@ -240,5 +247,51 @@ export class TaigaClient {
   ) {
     const text = link ? `${comment}\n\n${link.label || "Link"}: ${link.url}` : comment;
     return this.update(type, id, { comment: text });
+  }
+
+  /** List files/images attached to an item. */
+  async listAttachments(type: EntityType, id: number) {
+    const item = await this.get(type, id);
+    return this.request<any[]>(`/${ENTITY_ENDPOINT[type]}/attachments`, {
+      query: { object_id: id, project: item.project },
+    });
+  }
+
+  /**
+   * Attaches a local file (image, screenshot, doc, etc.) to a user story,
+   * task, epic, or issue. `filePath` must point to a file readable on this
+   * machine.
+   */
+  async addAttachment(
+    type: EntityType,
+    id: number,
+    filePath: string,
+    description?: string
+  ) {
+    const { readFile } = await import("node:fs/promises");
+    const { basename } = await import("node:path");
+
+    const item = await this.get(type, id);
+    const fileBuffer = await readFile(filePath);
+    const fileName = basename(filePath);
+
+    const form = new FormData();
+    form.append("object_id", String(id));
+    form.append("project", String(item.project));
+    if (description) form.append("description", description);
+    form.append("attached_file", new Blob([fileBuffer]), fileName);
+
+    const { data } = await this.requestRaw(`/${ENTITY_ENDPOINT[type]}/attachments`, {
+      method: "POST",
+      body: form,
+    });
+    return data;
+  }
+
+  /** Removes an attachment previously added with addAttachment. */
+  async deleteAttachment(type: EntityType, attachmentId: number) {
+    return this.request<void>(`/${ENTITY_ENDPOINT[type]}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    });
   }
 }
