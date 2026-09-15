@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -96,18 +97,37 @@ server.registerTool(
 );
 
 server.registerTool(
+  "taiga_list_roles",
+  {
+    description:
+      "List a project's roles, including which are 'computable' (i.e. estimate user stories). " +
+      "Use this to find a role id/name to pass to taiga_set_points on a project with more than one estimating role.",
+    inputSchema: { project: projectRefSchema },
+  },
+  async ({ project }) => safe(() => taiga.listRoles(project))
+);
+
+server.registerTool(
   "taiga_set_points",
   {
     description:
       "Set a user story's estimation points to a value from the project's point scale (see taiga_list_points). " +
-      "Only user stories have points in Taiga (not tasks, epics, or issues); this applies the value to every estimating role on the story.",
+      "Only user stories have points in Taiga (not tasks, epics, or issues). If the project has exactly one " +
+      "estimating role, the value is applied there automatically; if it has several (see taiga_list_roles), " +
+      "'role' is required to say which one to set, so other roles' existing estimates aren't touched.",
     inputSchema: {
       id: z.number().describe("The user story's numeric id."),
       points: z.number().describe("A value from the project's point scale, e.g. 5."),
       project: projectRefSchema,
+      role: z
+        .union([z.number(), z.string()])
+        .optional()
+        .describe(
+          "Role id or name to set points for (see taiga_list_roles). Required when the project has more than one estimating role."
+        ),
     },
   },
-  async ({ id, points, project }) => safe(() => taiga.setPoints(id, points, project))
+  async ({ id, points, project, role }) => safe(() => taiga.setPoints(id, points, project, role))
 );
 
 // ---- Read ----
@@ -199,18 +219,35 @@ server.registerTool(
       status: z.number().optional().describe("Status id (see taiga_list_statuses)."),
       assignedTo: z.number().optional().describe("User id to assign, or null to unassign."),
       milestone: z.number().optional().describe("Sprint/milestone id."),
+      epic: z
+        .number()
+        .optional()
+        .describe("Epic id to link this user story to (user stories only; adds the link, does not replace existing epic links)."),
     },
   },
-  async ({ type, id, subject, description, status, assignedTo, milestone }) =>
-    safe(() =>
-      taiga.update(type as EntityType, id, {
-        ...(subject !== undefined && { subject }),
-        ...(description !== undefined && { description }),
-        ...(status !== undefined && { status }),
-        ...(assignedTo !== undefined && { assigned_to: assignedTo }),
-        ...(milestone !== undefined && { milestone }),
-      })
-    )
+  async ({ type, id, subject, description, status, assignedTo, milestone, epic }) =>
+    safe(async () => {
+      const hasFieldUpdate =
+        subject !== undefined ||
+        description !== undefined ||
+        status !== undefined ||
+        assignedTo !== undefined ||
+        milestone !== undefined;
+      if (hasFieldUpdate) {
+        await taiga.update(type as EntityType, id, {
+          ...(subject !== undefined && { subject }),
+          ...(description !== undefined && { description }),
+          ...(status !== undefined && { status }),
+          ...(assignedTo !== undefined && { assigned_to: assignedTo }),
+          ...(milestone !== undefined && { milestone }),
+        });
+      }
+      if (epic !== undefined) {
+        if (type !== "userstory") throw new Error("epic linking only applies to user stories");
+        await taiga.linkEpic(epic, id);
+      }
+      return taiga.get(type as EntityType, id);
+    })
 );
 
 // ---- Comments / linking to work ----

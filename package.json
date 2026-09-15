@@ -1,14 +1,27 @@
 {
-  "name": "taiga-mcp",
+  "name": "taiga-agile-mcp",
   "version": "0.1.0",
   "description": "MCP server connecting Claude to Taiga projects, epics, user stories, tasks, issues and sprints.",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "Manuel Sanchez German",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/421648-1W3-Sanchez-German-Manuel/taiga-mcp.git"
+  },
+  "bin": {
+    "taiga-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
     "start": "tsx src/index.ts",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {

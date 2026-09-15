@@ -210,12 +210,17 @@ export class TaigaClient {
   }
 
   /**
-   * Sets a user story's points to a given Fibonacci value for every
-   * "computable" (estimating) role. Taiga stores points per-role as a
-   * mapping of role id -> points-scale-entry id, not the raw number, so
-   * this resolves `value` against the project's point scale first.
+   * Sets a user story's points to a given Fibonacci value. Taiga stores
+   * points per-role as a mapping of role id -> points-scale-entry id (not
+   * the raw number), and totals by summing every role's entry — so on a
+   * project with several computable roles (e.g. UX/Design/Front/Back),
+   * blindly writing the same value to every role would inflate the total
+   * instead of representing a single estimate. When the project has more
+   * than one computable role, `role` (its id or name, see listRoles) must
+   * say which one to set; with exactly one computable role it's applied
+   * there automatically, matching the old single-role behavior.
    */
-  async setPoints(id: number, value: number, projectRef?: string) {
+  async setPoints(id: number, value: number, projectRef?: string, role?: number | string) {
     const story = await this.get("userstory", id);
     const project = projectRef ? await this.resolveProjectId(projectRef) : story.project;
 
@@ -233,12 +238,37 @@ export class TaigaClient {
     }
 
     const computableRoles = roles.filter((r: any) => r.computable);
-    const pointsMap: Record<string, number> = {};
-    for (const role of computableRoles) {
-      pointsMap[String(role.id)] = pointEntry.id;
+    if (computableRoles.length === 0) {
+      throw new Error("This project has no computable (estimating) roles.");
     }
 
-    return this.update("userstory", id, { points: pointsMap });
+    let targetRoles: any[];
+    if (role !== undefined) {
+      const match = computableRoles.find((r: any) =>
+        typeof role === "number"
+          ? r.id === role
+          : r.name.toLowerCase() === role.toLowerCase() || r.slug === role
+      );
+      if (!match) {
+        const available = computableRoles.map((r: any) => `${r.name} (id ${r.id})`).join(", ");
+        throw new Error(`No computable role '${role}' in this project. Available: ${available}`);
+      }
+      targetRoles = [match];
+    } else if (computableRoles.length === 1) {
+      targetRoles = computableRoles;
+    } else {
+      const available = computableRoles.map((r: any) => `${r.name} (id ${r.id})`).join(", ");
+      throw new Error(
+        `This project has multiple computable roles; pass 'role' to say which one to set. Available: ${available}`
+      );
+    }
+
+    const existingPoints: Record<string, number> = { ...(story.points || {}) };
+    for (const r of targetRoles) {
+      existingPoints[String(r.id)] = pointEntry.id;
+    }
+
+    return this.update("userstory", id, { points: existingPoints });
   }
 
   async list(
@@ -267,9 +297,32 @@ export class TaigaClient {
 
   async create(type: EntityType, projectRef: string | undefined, fields: Record<string, unknown>) {
     const project = await this.resolveProjectId(projectRef);
-    return this.request<any>(`/${ENTITY_ENDPOINT[type]}`, {
+    // Taiga's userstory create endpoint silently ignores an `epic` field: linking
+    // to an epic is a separate relation, set via linkEpic() after creation.
+    const { epic, ...rest } = fields;
+    const created = await this.request<any>(`/${ENTITY_ENDPOINT[type]}`, {
       method: "POST",
-      body: { project, ...fields },
+      body: { project, ...rest },
+    });
+    if (type === "userstory" && typeof epic === "number") {
+      await this.linkEpic(epic, created.id);
+      return this.get(type, created.id);
+    }
+    return created;
+  }
+
+  /** Links a user story to an epic (Taiga models this as its own relation, not a field on the story). */
+  async linkEpic(epicId: number, userStoryId: number) {
+    return this.request<any>(`/epics/${epicId}/related_userstories`, {
+      method: "POST",
+      body: { epic: epicId, user_story: userStoryId },
+    });
+  }
+
+  /** Removes the link between a user story and an epic. */
+  async unlinkEpic(epicId: number, userStoryId: number) {
+    await this.requestRaw(`/epics/${epicId}/related_userstories/${userStoryId}`, {
+      method: "DELETE",
     });
   }
 
