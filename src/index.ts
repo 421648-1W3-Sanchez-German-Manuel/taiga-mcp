@@ -17,6 +17,43 @@ const projectRefSchema = z
     "Project slug or numeric id. Omit to use the configured default project (TAIGA_PROJECT)."
   );
 
+const TASK_TYPE_LABEL: Record<string, string> = {
+  automatizada: "Automatizada (IA)",
+  humana: "Ejecución humana",
+  revision: "Revisión/Integración",
+};
+
+/**
+ * Builds a task description following the team's technical task template
+ * (Descripción Técnica / Estimación en Horas / Tipo de Tarea / Criterios de
+ * Aceptación) from structured fields, falling back to plain `description`
+ * when no template fields are given.
+ */
+function buildTaskDescription(fields: {
+  description?: string;
+  technicalDescription?: string;
+  estimatedHours?: number;
+  taskType?: string;
+  acceptanceCriteria?: string;
+}): string | undefined {
+  const { description, technicalDescription, estimatedHours, taskType, acceptanceCriteria } = fields;
+  const hasTemplateFields =
+    technicalDescription !== undefined ||
+    estimatedHours !== undefined ||
+    taskType !== undefined ||
+    acceptanceCriteria !== undefined;
+
+  if (!hasTemplateFields) return description;
+
+  const sections: string[] = [];
+  if (description) sections.push(description);
+  if (technicalDescription) sections.push(`**Descripción Técnica:**\n${technicalDescription}`);
+  if (estimatedHours !== undefined) sections.push(`**Estimación en Horas:** ${estimatedHours}`);
+  if (taskType) sections.push(`**Tipo de Tarea:** ${TASK_TYPE_LABEL[taskType] || taskType}`);
+  if (acceptanceCriteria) sections.push(`**Criterios de Aceptación Técnicos:**\n${acceptanceCriteria}`);
+  return sections.join("\n\n");
+}
+
 function toResult(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
 }
@@ -177,24 +214,71 @@ server.registerTool(
   "taiga_create_item",
   {
     description:
-      "Create a new user story, task, epic, or issue in a project. For tasks, pass user_story in extraFields to attach it to a user story.",
+      "Create a new user story, task, epic, or issue in a project. For tasks, pass user_story in extraFields to attach it to a user story. " +
+      "For tasks, prefer filling technicalDescription/estimatedHours/taskType/acceptanceCriteria over the plain description field: " +
+      "they are combined into a structured description following the team's technical task template " +
+      "(Descripción Técnica, Estimación en Horas, Tipo de Tarea, Criterios de Aceptación Técnicos).",
     inputSchema: {
       type: entityTypeSchema,
       project: projectRefSchema,
       subject: z.string().describe("Title of the item."),
-      description: z.string().optional(),
+      description: z.string().optional().describe("Freeform description. For tasks, prefer the structured fields below instead."),
+      technicalDescription: z
+        .string()
+        .optional()
+        .describe(
+          "Descripción Técnica (tasks): texto técnico claro y preciso que detalle las operaciones a realizar (escribir código, diseñar interfaces, refactorizar, preparar servidor web, etc.)."
+        ),
+      estimatedHours: z
+        .number()
+        .optional()
+        .describe(
+          "Estimación en Horas (tasks): tiempo ideal u horas pendientes para su ejecución; debe ser una unidad pequeña, realizable en un día o menos."
+        ),
+      taskType: z
+        .enum(["automatizada", "humana", "revision"])
+        .optional()
+        .describe(
+          "Tipo de Tarea (tasks): 'automatizada' (ejecutada por IA), 'humana' (ejecución humana), o 'revision' (revisión/integración)."
+        ),
+      acceptanceCriteria: z
+        .string()
+        .optional()
+        .describe(
+          "Criterios de Aceptación Técnicos (tasks): criterios mensurables verificables por una audiencia técnica (el equipo/arquitectos), no por el propietario del producto."
+        ),
       status: z.number().optional().describe("Status id (see taiga_list_statuses)."),
-      assignedTo: z.number().optional().describe("User id to assign."),
+      assignedTo: z.number().optional().describe("User id to assign (Responsable/Desarrollador)."),
       milestone: z.number().optional().describe("Sprint/milestone id (user stories)."),
-      userStory: z.number().optional().describe("Parent user story id (tasks only)."),
+      userStory: z.number().optional().describe("Parent user story id (tasks only) — the ID de la Tarea's linked user story."),
       epic: z.number().optional().describe("Parent epic id (to link a user story to an epic)."),
     },
   },
-  async ({ type, project, subject, description, status, assignedTo, milestone, userStory, epic }) =>
+  async ({
+    type,
+    project,
+    subject,
+    description,
+    technicalDescription,
+    estimatedHours,
+    taskType,
+    acceptanceCriteria,
+    status,
+    assignedTo,
+    milestone,
+    userStory,
+    epic,
+  }) =>
     safe(() =>
       taiga.create(type as EntityType, project, {
         subject,
-        description,
+        description: buildTaskDescription({
+          description,
+          technicalDescription,
+          estimatedHours,
+          taskType,
+          acceptanceCriteria,
+        }),
         status,
         assigned_to: assignedTo,
         milestone,
